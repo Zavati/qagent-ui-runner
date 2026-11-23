@@ -1,0 +1,9 @@
+{
+  "preparations": {
+    "prepare_stg": {
+      "module": "./prepare.mjs",
+      "allowedOrigins": ["https://stg.example.test"],
+      "liveAllowed": true
+    }
+  }
+}

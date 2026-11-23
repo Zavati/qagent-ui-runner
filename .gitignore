@@ -1,0 +1,8 @@
+node_modules/
+qagent-results/
+/runner.config.json
+/storage-state.json
+/private-runner/
+*.log
+/core
+/core.[0-9]*

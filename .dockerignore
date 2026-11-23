@@ -1,0 +1,8 @@
+node_modules
+qagent-results
+test
+.git
+*.zip
+*.log
+runner.config.json
+storage-state.json

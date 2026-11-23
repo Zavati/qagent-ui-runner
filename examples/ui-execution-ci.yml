@@ -1,0 +1,29 @@
+# Example caller pipeline AFTER target application deployment and test-state preparation are available.
+name: Observed UI regression
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  observed-ui:
+    runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    env:
+      QAGENT_API_URL: https://api.apiqagent.com
+      QAGENT_PROJECT_ID: ${{ vars.QAGENT_PROJECT_ID }}
+      QAGENT_ENVIRONMENT_ID: ${{ vars.QAGENT_ENVIRONMENT_ID }}
+      QAGENT_TOKEN: ${{ secrets.QAGENT_UI_AUTOMATION_TOKEN }}
+      QAGENT_TEST_PREPARATION_TOKEN: ${{ secrets.QAGENT_TEST_PREPARATION_TOKEN }}
+      QAGENT_RUNNER_CONFIG: ./private-runner/runner.config.json
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --ignore-scripts
+      # Provision private-runner/ locally from the application's own QA configuration.
+      - name: Replay then Live for all eligible immutable designs
+        run: node src/cli.js create --all --profile profile_stg_chromium --target-build "$GITHUB_SHA" --operation-id "ui_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" --run
+      - name: Retain the complete report and its NDJSON evidence pages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qagent-ui-results
+          path: qagent-results/
+          if-no-files-found: warn
