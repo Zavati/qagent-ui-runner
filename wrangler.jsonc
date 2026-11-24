@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "qagent-ui-runner",
+  "main": "cloudflare/index.js",
+  "compatibility_date": "2026-11-24",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "UiExecutionContainer",
+      "image": "./Dockerfile.cloudflare",
+      "instance_type": "standard-1",
+      "max_instances": 5
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "UI_RUNNER_CONTAINERS", "class_name": "UiExecutionContainer" }]
+  },
+  "migrations": [{ "tag": "ui-exec2-container-v1", "new_sqlite_classes": ["UiExecutionContainer"] }]
+  // Configure via `wrangler secret put`:
+  // UI_RUNNER_DISPATCH_SECRET (same value in Gateway)
+  // UI_RUNNER_SCOPES_JSON (scoped machine tokens; never commit the real JSON)
+}

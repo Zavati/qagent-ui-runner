@@ -90,7 +90,7 @@ export class UiRunner {
       }
     } catch (error) {
       if (this.modeProgress?.executionPerformed || modes.length) {
-        const fallback = await technicalPair(claim, codeOf(error), this.outputDirectory);
+        const fallback = await technicalPair(claim, codeOf(error), this.outputDirectory, this.onEvidence);
         for (const mode of MODES) {
           if (modes.some(m => m.mode === mode)) continue;
           const row = fallback.modes.find(m => m.mode === mode);
@@ -102,12 +102,25 @@ export class UiRunner {
           modes.push(row); evidence.push(...fallback.evidence.filter(e => e.mode === mode));
         }
       } else throw error;
-    } finally { await store.dispose(); }
+    } finally {
+      try { await store.dispose(); }
+      catch {
+        // Cleanup cannot erase a browser execution or replace an earlier source
+        // error. Keep the completed reports and their measured counters intact.
+        // This diagnostic needs no additional disk I/O: the cleanup failure may
+        // itself be caused by an unavailable filesystem.
+        const lastMode = modes.at(-1);
+        if (lastMode) {
+          lastMode.reasonCodes = sorted([...lastMode.reasonCodes, 'UI_RUNNER_ARTIFACT_CLEANUP_FAILED']);
+          if (lastMode.status === 'PASSED') lastMode.status = 'INCOMPLETE';
+        }
+      }
+    }
     return { contractVersion: 'qagent.ui-execution-pair-result.v1', runnerVersion: VERSION, startedAt, completedAt: new Date().toISOString(), executionPerformed: modes.some(m => m.executionPerformed), modes, evidence };
   }
   async runMode({ claim, mode, spec, envelope, profile, binding, store, signal }) {
     // Persist reports locally before transport. Evidence upload failure cannot erase executed results.
-    const ledger = new Ledger(mode, this.outputDirectory);
+    const ledger = new Ledger(mode, this.outputDirectory, { onEvidence: this.onEvidence });
     const accounting = new CoverageAccounting(envelope, store, ledger), counts = initialCounts(spec);
     this.modeProgress = { mode, executionPerformed: false, counts };
     const controller = new AbortController(), modeSignal = controller.signal;
@@ -126,6 +139,7 @@ export class UiRunner {
         status = 'BLOCKED'; await ledger.pending(null, 'UI_TEST_DESIGN_REPLAY_FIXTURES_UNAVAILABLE');
       } else {
         const preparation = await resolvePreparation(this.preparations, profile, mode);
+        for (const reason of preparation.pendingReasons ?? []) await ledger.pending(null, reason);
         browser = await launchBrowserSafely(this.browserLauncher, { headless: true, ...(this.executablePath ? { executablePath: this.executablePath } : {}) }, modeSignal);
         context = await browser.newContext({ viewport: profile.viewport, deviceScaleFactor: profile.deviceScaleFactor, locale: profile.locale, timezoneId: profile.timezoneId, serviceWorkers: 'block', acceptDownloads: false, storageState: preparation.storageState });
         context.setDefaultTimeout(profile.stepTimeoutMs); context.setDefaultNavigationTimeout(profile.stepTimeoutMs);
@@ -199,7 +213,10 @@ export class UiRunner {
     counts.checksPassed = ledger.statuses.PASSED; counts.checksFailed = ledger.statuses.FAILED; counts.checksPending = ledger.statuses.PENDING; counts.requestsObserved = ledger.lengths.network;
     if (!caught && !['BLOCKED', 'CANCELLED'].includes(status)) status = counts.checksFailed ? 'FAILED' : counts.checksPending || ledger.lengths.pending || counts.actionsExecuted !== counts.actionsPlanned || counts.checkpointsReached !== counts.checkpointsPlanned || !executionPerformed || !counts.checksPassed ? 'INCOMPLETE' : 'PASSED';
     const reports = await ledger.finish();
-    return { mode: { mode, status, reasonCodes: sorted(ledger.reasons), executionPerformed, counts, ...reports }, evidence: ledger.evidence };
+    const modeResult = { mode, status, reasonCodes: sorted(ledger.reasons), executionPerformed, counts, ...reports };
+    // A completed mode remains inspectable if the container exits during the next mode.
+    await ledger.attachment('MODE_RESULT', Buffer.from(JSON.stringify(modeResult)), 'application/json', '.json');
+    return { mode: modeResult, evidence: ledger.evidence };
   }
 }
 

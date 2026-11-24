@@ -4,7 +4,7 @@ import { FixtureMatcher, contextOf, requestIdentity, responseForFixture } from '
 const runtimeType = value => ({ xhr: 'XHR', fetch: 'Fetch', document: 'Document', script: 'Script', stylesheet: 'Stylesheet', image: 'Image', font: 'Font' }[value] ?? value);
 export class NetworkController {
   static async create(options) { const matcher = await FixtureMatcher.create(options.envelope.bundle.fixtures, options.store); return new NetworkController({ ...options, matcher }); }
-  constructor(options) { Object.assign(this, options); this.records = new Map(); this.inflight = new Set(); this.serial = 0; this.context = null; this.errors = []; this.quiesceAt = Date.now(); this.flushErrors = []; }
+  constructor(options) { Object.assign(this, options); this.records = new Map(); this.persisted = new Set(); this.inflight = new Set(); this.serial = 0; this.context = null; this.errors = []; this.quiesceAt = Date.now(); this.flushErrors = []; }
   async install(browserContext) {
     browserContext.on('request', request => {
       const context = contextOf(this.context);
@@ -18,7 +18,11 @@ export class NetworkController {
         this.errors.push(codeOf(e));
         await this.ledger.pending(record ? this.sourceFor(record) : null, codeOf(e, 'UI_RUNNER_NETWORK_TRANSPORT_ERROR'));
         try { await route.abort('failed'); } catch {}
-      }).finally(() => { this.inflight.delete(p); this.quiesceAt = Date.now(); });
+      }).finally(async () => {
+        try { await this.persistRecord(this.records.get(route.request())); }
+        catch (error) { this.flushErrors.push(error); }
+        finally { this.inflight.delete(p); this.quiesceAt = Date.now(); }
+      });
       this.inflight.add(p); return p;
     });
     // No covert WebSocket business calls outside the HTTP fixture matcher.
@@ -32,6 +36,11 @@ export class NetworkController {
     });
   }
   sourceFor(record) { return { requestId: record.id, context: record.context }; }
+  async persistRecord(record) {
+    if (!record || this.persisted.has(record.id)) return;
+    if (!record.completedAt && !record.reasonCode) { record.reasonCode = 'UI_RUNNER_REQUEST_NOT_COMPLETED'; await this.ledger.pending(this.sourceFor(record), record.reasonCode); }
+    await this.ledger.append('network', record); this.persisted.add(record.id);
+  }
   async handle(route) {
     checkAbort(this.signal); const request = route.request();
     let record = this.records.get(request);
@@ -82,6 +91,9 @@ export class NetworkController {
     const response = await route.fetch({ maxRedirects: 0, maxRetries: 0, timeout: this.profile.stepTimeoutMs });
     try {
       record.status = response.status();
+      if (this.mode === 'UI_LIVE' && [401, 403].includes(record.status) && fixture?.response.replayStatus !== record.status) {
+        await this.ledger.check('APPLICATION_ACCESS', 'FAILED', this.sourceFor(record), { access: 'AVAILABLE' }, { status: record.status }, record.status === 401 ? 'UI_RUNNER_AUTHENTICATION_REQUIRED' : 'UI_RUNNER_ACCESS_FORBIDDEN');
+      }
       const responseHeaders = response.headers(), location = responseHeaders.location;
       if (record.status >= 300 && record.status < 400 && location && !this.binding.permits(new URL(location, request.url()).href)) { await fail('UI_RUNNER_REDIRECT_ORIGIN_NOT_ALLOWED'); return; }
       if (business && fixture) {
@@ -115,10 +127,8 @@ export class NetworkController {
   }
   async finish() {
     await Promise.allSettled(this.inflight);
-    for (const record of this.records.values()) {
-      if (!record.completedAt && !record.reasonCode) { record.reasonCode = 'UI_RUNNER_REQUEST_NOT_COMPLETED'; await this.ledger.pending(this.sourceFor(record), record.reasonCode); }
-      await this.ledger.append('network', record);
-    }
+    for (const record of this.records.values()) await this.persistRecord(record);
+    if (this.flushErrors.length) throw this.flushErrors[0];
     for (const row of this.matcher.entries) {
       const f = row.fixture, ref = { pointer: '/bundle/fixtures/' + this.envelope.bundle.fixtures.indexOf(f) + '/consumption', manifestHash: this.envelope.manifestHash };
       const okay = row.consumed >= f.consumption.minimum && row.consumed <= f.consumption.maximum;

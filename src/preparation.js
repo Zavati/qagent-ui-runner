@@ -19,6 +19,17 @@ async function localPath(config, path) {
   return actual;
 }
 export async function resolvePreparation(config, profile, mode) {
+  if (profile.preparationMode === 'UNAUTHENTICATED') {
+    // An explicit environment choice, never a successful login/seed/build check.
+    // Keep both browser modes runnable while reporting the missing prerequisites.
+    return { storageState: undefined, pendingReasons: [
+      'UI_RUNNER_AUTHENTICATION_NOT_CONFIGURED',
+      'UI_RUNNER_TARGET_BUILD_UNVERIFIED',
+      'UI_RUNNER_BASELINE_STATE_UNPREPARED',
+      ...(mode === 'UI_LIVE' ? ['UI_RUNNER_LIVE_STATE_NOT_PREPARED'] : []),
+    ], async run() { return { ready: false, baselineReady: false, verifiedTargetBuildRef: null, liveStatePrepared: false }; } };
+  }
+  insist(profile.preparationMode === undefined || profile.preparationMode === 'REQUIRE_ADAPTER', 'UI_RUNNER_PREPARATION_MODE_INVALID');
   const local = config.preparations?.[profile.preparationKey];
   insist(local && typeof local === 'object', 'UI_RUNNER_PREPARATION_NOT_CONFIGURED');
   insist(Array.isArray(local.allowedOrigins) && local.allowedOrigins.length && local.allowedOrigins.every(x => validOrigin(x)), 'UI_RUNNER_PREPARATION_ORIGINS_INVALID');
@@ -41,6 +52,7 @@ export async function resolvePreparation(config, profile, mode) {
 
 export function validateProfile(profile, scope) {
   insist(profile && same(profile.scope, scope), 'UI_RUNNER_PROFILE_SCOPE_MISMATCH');
+  insist(profile.preparationMode === undefined || ['REQUIRE_ADAPTER', 'UNAUTHENTICATED'].includes(profile.preparationMode), 'UI_RUNNER_PREPARATION_MODE_INVALID');
   insist(typeof profile.preparationKey === 'string' && profile.preparationKey.length > 0, 'UI_RUNNER_PREPARATION_NOT_CONFIGURED');
   insist(Number.isSafeInteger(profile.viewport?.width) && Number.isSafeInteger(profile.viewport?.height) && profile.viewport.width > 0 && profile.viewport.height > 0, 'UI_RUNNER_VIEWPORT_INVALID');
   insist(typeof profile.deviceScaleFactor === 'number' && profile.deviceScaleFactor > 0 && profile.deviceScaleFactor <= 8, 'UI_RUNNER_DEVICE_SCALE_INVALID');

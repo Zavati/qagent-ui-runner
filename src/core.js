@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 export const MODES = ['UI_REPLAY', 'UI_LIVE'];
 export class RunnerError extends Error {
   constructor(code, details = {}, options) { super(code, options); this.name = 'RunnerError'; this.code = code; this.details = details; }

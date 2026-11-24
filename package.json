@@ -1,18 +1,31 @@
 {
   "name": "qagent-ui-runner",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Deterministic execution of immutable QAgent observed UI plans",
   "type": "module",
-  "engines": { "node": ">=22.0.0" },
-  "bin": { "qagent-ui-runner": "src/cli.js" },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "bin": {
+    "qagent-ui-runner": "src/cli.js"
+  },
   "scripts": {
     "build": "npm run check",
     "check": "node scripts/check.mjs",
     "test": "node --test test/*.test.js",
     "test:browser": "node --test test/browser.acceptance.js",
     "browser:install": "playwright install chromium",
-    "start": "node src/cli.js"
+    "start": "node src/cli.js",
+    "deploy": "wrangler deploy",
+    "deploy:check": "wrangler deploy --dry-run --outdir .wrangler-dry-run",
+    "start:hosted": "node src/hosted-server.js",
+    "test:hosted": "node --test test/hosted-cloudflare.test.js test/hosted-server.test.js"
   },
-  "dependencies": { "playwright": "1.62.1" }
+  "dependencies": {
+    "playwright": "1.62.1"
+  },
+  "devDependencies": {
+    "wrangler": "4.168.0"
+  }
 }

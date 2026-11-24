@@ -61,7 +61,8 @@ export class GatewayClient {
   result(claim, result) { return this.request(this.itemPath(claim) + '/result', { method: 'POST', body: { claimToken: claim.claimToken, result } }); }
   evidence(claim, ref, bytes) {
     insist(bytes.length === ref.byteLength && sha256(bytes) === ref.sha256, 'UI_RUNNER_UPLOAD_HASH_MISMATCH');
-    return this.request(this.itemPath(claim) + '/evidence/' + encodeURIComponent(ref.evidenceId), { method: 'POST', binary: bytes, headers: { 'Content-Type': ref.contentType, 'X-QAgent-Claim-Token': claim.claimToken, 'X-QAgent-SHA256': ref.sha256 } });
+    return this.request(this.itemPath(claim) + '/evidence/' + encodeURIComponent(ref.evidenceId), { method: 'POST', binary: bytes, timeoutMs: this.evidenceTimeoutMs, headers: { 'Content-Type': ref.contentType, 'X-QAgent-Claim-Token': claim.claimToken, 'X-QAgent-SHA256': ref.sha256,
+      ...(ref.mode ? { 'X-QAgent-Evidence-Mode': ref.mode } : {}), ...(ref.kind ? { 'X-QAgent-Evidence-Kind': ref.kind } : {}) } });
   }
   report(id, format) { return this.request('/batches/' + encodeURIComponent(id) + '/report?format=' + format, { raw: true }); }
 }

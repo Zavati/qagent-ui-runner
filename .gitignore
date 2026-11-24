@@ -3,6 +3,7 @@ qagent-results/
 /runner.config.json
 /storage-state.json
 /private-runner/
+/private-cloudflare/
 *.log
 /core
 /core.[0-9]*
