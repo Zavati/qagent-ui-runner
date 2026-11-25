@@ -42,7 +42,7 @@ export class Worker {
       try {
         this.log({ event: 'ui.execution.started', batchId: claim.batchId, itemId: claim.itemId });
         const sourceResponse = await this.client.source(claim, controller.signal);
-        const engine = this.engineFactory({ preparations: this.preparations, outputDirectory: directory, executablePath: this.executablePath, onEvidence });
+        const engine = this.engineFactory({ preparations: this.preparations, outputDirectory: directory, executablePath: this.executablePath, onEvidence, authProvider: (activeClaim, signal) => this.client.browserAuth(activeClaim, signal) });
         pair = await engine.runPair({ claim, sourceResponse, readArtifact: (id, options) => this.client.artifact(claim, id, options), signal: controller.signal });
       } catch (error) {
         const code = codeOf(controller.signal.aborted ? controller.signal.reason : error);

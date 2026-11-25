@@ -55,6 +55,12 @@ export class GatewayClient {
   cancel(id) { return this.request('/batches/' + encodeURIComponent(id) + '/cancel', { method: 'POST', body: {} }); }
   claim(id, workerId) { return this.request('/batches/' + encodeURIComponent(id) + '/claim', { method: 'POST', body: { workerId }, retry: false }); }
   itemPath(claim) { return '/batches/' + encodeURIComponent(claim.batchId) + '/items/' + encodeURIComponent(claim.itemId); }
+  browserAuth(claim, signal) {
+    return this.request(this.itemPath(claim) + '/browser-auth', {
+      method: 'POST', body: { claimToken: claim.claimToken }, retry: false,
+      signal, maxBytes: 32768,
+    });
+  }
   heartbeat(claim) { return this.request(this.itemPath(claim) + '/heartbeat', { method: 'POST', body: { claimToken: claim.claimToken } }); }
   source(claim, signal) { return this.request(this.itemPath(claim) + '/source', { method: 'POST', body: { claimToken: claim.claimToken }, signal, timeoutMs: this.evidenceTimeoutMs }); }
   artifact(claim, artifactId, options) { return this.request(this.itemPath(claim) + '/artifacts/' + encodeURIComponent(artifactId), { method: 'POST', body: { claimToken: claim.claimToken }, raw: true, timeoutMs: this.evidenceTimeoutMs, ...options }); }

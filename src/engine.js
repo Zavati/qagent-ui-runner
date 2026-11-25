@@ -69,8 +69,8 @@ async function prepareContext(context, preparation, binding, args) {
   finally { await page.close().catch(() => {}); await context.unroute('**/*', guard); }
 }
 export class UiRunner {
-  constructor({ preparations = { preparations: {}, directory: process.cwd() }, outputDirectory, browserLauncher, executablePath, onEvidence } = {}) {
-    Object.assign(this, { preparations, outputDirectory: outputDirectory ?? 'qagent-results', browserLauncher: browserLauncher ?? (args => chromium.launch(args)), executablePath, onEvidence });
+  constructor({ preparations = { preparations: {}, directory: process.cwd() }, outputDirectory, browserLauncher, executablePath, onEvidence, authProvider } = {}) {
+    Object.assign(this, { preparations, outputDirectory: outputDirectory ?? 'qagent-results', browserLauncher: browserLauncher ?? (args => chromium.launch(args)), executablePath, onEvidence, authProvider });
   }
   async runPair({ claim, sourceResponse, readArtifact, signal }) {
     this.modeProgress = null;
@@ -143,7 +143,7 @@ export class UiRunner {
         browser = await launchBrowserSafely(this.browserLauncher, { headless: true, ...(this.executablePath ? { executablePath: this.executablePath } : {}) }, modeSignal);
         context = await browser.newContext({ viewport: profile.viewport, deviceScaleFactor: profile.deviceScaleFactor, locale: profile.locale, timezoneId: profile.timezoneId, serviceWorkers: 'block', acceptDownloads: false, storageState: preparation.storageState });
         context.setDefaultTimeout(profile.stepTimeoutMs); context.setDefaultNavigationTimeout(profile.stepTimeoutMs);
-        await prepareContext(context, preparation, binding, { profile, targetBuildRef: claim.targetBuildRef, signal: modeSignal });
+        await prepareContext(context, preparation, binding, { profile, targetBuildRef: claim.targetBuildRef, signal: modeSignal, authProvider: this.authProvider, claim });
         await context.tracing.start({ screenshots: true, snapshots: true, sources: false });
         network = await NetworkController.create({ mode, envelope, store, ledger, profile, binding, accounting, signal: modeSignal });
         await network.install(context);
