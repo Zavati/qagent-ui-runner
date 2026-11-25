@@ -1,6 +1,6 @@
 {
   "name": "qagent-ui-runner",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Deterministic execution of immutable QAgent observed UI plans",
   "type": "module",
@@ -20,7 +20,8 @@
     "deploy": "wrangler deploy",
     "deploy:check": "wrangler deploy --dry-run --outdir .wrangler-dry-run",
     "start:hosted": "node src/hosted-server.js",
-    "test:hosted": "node --test test/hosted-cloudflare.test.js test/hosted-server.test.js"
+    "test:hosted": "node --test test/hosted-cloudflare.test.js test/hosted-server.test.js",
+    "dev": "wrangler dev"
   },
   "dependencies": {
     "playwright": "1.62.1"

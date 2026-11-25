@@ -8,7 +8,7 @@ import { Worker } from './worker.js';
 import { loadPreparations } from './preparation.js';
 import { RunnerError, insist, codeOf } from './core.js';
 
-const HELP = `QAgent UI Runner 0.2.0
+const HELP = `QAgent UI Runner 0.2.1
 
 create --profile ID --target-build REF (--all | --design-version ID [--design-version ID ...]) [--run]
 run --batch ID

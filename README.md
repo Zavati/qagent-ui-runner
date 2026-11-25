@@ -1,4 +1,4 @@
-# QAgent UI Runner 0.2.0 — UI-EXEC-2
+# QAgent UI Runner 0.2.1 — UI-EXEC-2
 
 Runner Node.js + Playwright Chromium para executar planos imutáveis `qagent.ui-test-design.v2` em **lotes**. Um item representa uma observação e produz dois resultados: `UI_REPLAY`, seguido de `UI_LIVE`, em contextos de navegador novos e independentes.
 
@@ -22,11 +22,50 @@ Esta versão inclui hospedagem em **Cloudflare Containers**, com Worker e Durabl
 
 **Executar ações e comparar campos não significa que `ALL_OBSERVED` está completamente validado.** Metadados da fonte, propriedades de documentos/recursos e suas relações, HTML/JS arquivados, comparação de screenshots e campos sem comparador permanecem registrados como pendentes. Checkpoint instável ou sem ligação, iframe, shadow DOM, arquivo, multiselect, popup, download, diálogo e WebSocket também não recebem aprovação implícita.
 
-O contabilizador desta 0.2.0 registra sempre pendências para os metadados da fonte e os documentos de um envelope normal. Portanto, **o gate `ALL_OBSERVED` permanece `INCOMPLETE` quando as verificações executadas não falham**; também pode terminar `FAILED`, `BLOCKED`, `ERROR` ou `CANCELLED`. Não há caminho honesto para um envelope normal ficar completamente `PASSED` nesta cobertura inicial. `INCOMPLETE` sai com código **2**, e não com sucesso de CI. A interface/protocolo de CI estão preparados; os comparadores de cobertura integral ainda precisam ser implementados. Reduzir o contador ou apagar uma seção não é uma alternativa.
+O contabilizador desta 0.2.1 registra sempre pendências para os metadados da fonte e os documentos de um envelope normal. Portanto, **o gate `ALL_OBSERVED` permanece `INCOMPLETE` quando as verificações executadas não falham**; também pode terminar `FAILED`, `BLOCKED`, `ERROR` ou `CANCELLED`. Não há caminho honesto para um envelope normal ficar completamente `PASSED` nesta cobertura inicial. `INCOMPLETE` sai com código **2**, e não com sucesso de CI. A interface/protocolo de CI estão preparados; os comparadores de cobertura integral ainda precisam ser implementados. Reduzir o contador ou apagar uma seção não é uma alternativa.
 
 As fixtures indisponíveis por cache HTTP 304 continuam como a pendência acordada. Elas bloqueiam Replay; Live é avaliado separadamente. Esta versão não reconstrói corpos de cache nem transforma 304 em resposta inventada.
 
-## Instalação e hospedagem Cloudflare
+## Deploy pelo mesmo padrão do Gateway
+
+O workflow `.github/workflows/runner-ci.yml` agora testa e publica o serviço.
+A configuração foi comparada com `.github/workflows/deploy.yml` do `qagent-gateway`:
+
+| Configuração | Runner UI |
+| --- | --- |
+| Publicação automática | Push na `main`, depois dos testes. |
+| Publicação manual | GitHub Actions → Run workflow, selecionando `main`. |
+| Executor de deploy | `ubuntu-latest`, com Docker verificado por `docker info`. |
+| GitHub Environment | `CLOUDFLARE_API_TOKEN`, mesmo nome do Gateway. |
+| Secrets de deploy | `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`. |
+| Comando | `npx wrangler deploy`. |
+| Node no job de deploy | 24, compatível com o Runner e o Wrangler desta versão. |
+
+O job de testes existente continua na imagem Playwright fixada. Ele executa
+verificação sintática, testes Node e aceitação Chromium. O job de publicação
+depende de seu sucesso e roda no host Ubuntu, com acesso ao Docker. Pull requests
+e outras branches executam testes sem publicar. Deploys deste workflow são
+serializados; um novo push não interrompe uma publicação em andamento.
+
+No repositório `qagent-ui-runner`, disponibilize os mesmos nomes de secrets no
+Environment `CLOUDFLARE_API_TOKEN` ou conceda acesso aos secrets de organização.
+Um secret definido apenas no repositório do Gateway não é copiado para outro
+repositório pelo workflow. O valor do token deve autorizar Worker e Containers
+na conta selecionada. Nenhuma credencial foi incluída no código.
+
+O build da imagem acontece no GitHub neste fluxo. Você pode copiar os arquivos,
+conferir o diff e fazer seu commit/push sem executar Docker no computador local.
+O container continua necessário para o processo Node/Chromium; o arquivo Wrangler
+mantém a imagem, o Durable Object, a migration e a entrada interna do serviço.
+
+Os secrets de runtime `UI_RUNNER_DISPATCH_SECRET` e `UI_RUNNER_SCOPES_JSON`
+continuam configurados no Worker. Eles permitem receber o despacho e consumir
+os lotes do QAgent; são distintos das credenciais que autorizam o deploy.
+O workflow não os recria nem substitui em cada publicação.
+
+Se preferir deploy manual local, use a seção seguinte com Docker ativo.
+
+## Instalação e deploy local
 
 Node.js 22 ou superior; Node 24 permite usar também as suítes SQLite dos demais projetos. Para hospedar, é preciso Docker Desktop/daemon ativo e uma conta Cloudflare com Workers Paid/Containers. Na pasta do Runner:
 
@@ -197,12 +236,12 @@ A superfície de máquina UI continua `/v1/automation/projects/:projectId/enviro
 Para um executor próprio, o `Dockerfile` mantém a CLI. O `Dockerfile.cloudflare` é a entrada hospedada publicada por Wrangler.
 
 ```bash
-docker build -t qagent-ui-runner:0.2.0 .
+docker build -t qagent-ui-runner:0.2.1 .
 docker run --rm --init --ipc=host \
   --env-file ./private-runner/runner.env \
   -v "$PWD/private-runner:/config:ro" \
   -v "$PWD/qagent-results:/app/qagent-results" \
-  qagent-ui-runner:0.2.0 \
+  qagent-ui-runner:0.2.1 \
   run --batch uieb_id_do_lote --config /config/runner.config.json
 ```
 
